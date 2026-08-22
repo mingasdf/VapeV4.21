@@ -86,12 +86,12 @@ public class AutoMace extends Mod {
     private int armorOriginalSlot = -1;
     private int armorTargetSlot = -1;
     private int armorSwapTicks;
-	private boolean shieldBreakerActive = false;
-	private boolean shieldBreakerWaitingToAttack = false;
-	private int shieldBreakerSwapTicks = 0;
-	private int shieldBreakerOriginalSlot = -1;
-	private int shieldBreakerAxeSlot = -1;
-	private EntityLivingBase shieldBreakerTarget = null;
+    private boolean shieldBreakerActive = false;
+    private boolean shieldBreakerWaitingToAttack = false;
+    private int shieldBreakerSwapTicks = 0;
+    private int shieldBreakerOriginalSlot = -1;
+    private int shieldBreakerAxeSlot = -1;
+    private EntityLivingBase shieldBreakerTarget = null;
 
     public AutoMace() {
         super("AutoMace", MODULE_ID, Category.COMBAT);
@@ -164,61 +164,65 @@ public class AutoMace extends Mod {
     }
 
     @EventHandler
-	public void onTick(EventPreTick event) {
-		EntityPlayerSP player = event.getThePlayer();
-		if (player.isNull()) {
-			this.reset(false);
-			return;
-		}
-		if (this.shieldBreakerActive) {
-			this.updateShieldBreaker(player);
-			return;
-		}
-		if (this.releasePending) {
-			AttackKeyController.releaseAttackKey();
-			this.releasePending = false;
-		}
-		this.updateSwap(player);
-		this.updateAimAndAutoAttack(player);
-		this.updateElytraSwap(player);
-	}
+    public void onTick(EventPreTick event) {
+        EntityPlayerSP player = event.getThePlayer();
+        if (player.isNull()) {
+            this.reset(false);
+            return;
+        }
+        if (this.shieldBreakerActive) {
+            this.updateShieldBreaker(player);
+            return;
+        }
+        if (this.releasePending) {
+            AttackKeyController.releaseAttackKey();
+            this.releasePending = false;
+        }
+        this.updateSwap(player);
+        this.updateAimAndAutoAttack(player);
+        this.updateElytraSwap(player);
+    }
 
     private void handleAttack(Event event) {
-		if (this.swapActive || !this.canOperate()) {
-			return;
-		}
-		EntityPlayerSP player = Minecraft.thePlayer();
-		EntityLivingBase target = this.getCrosshairTarget();
-		if (player.isNull() || target == null) {
-			return;
-		}
-		if (this.shouldStunSlam(target)) {
-			ItemStack held = player.getHeldItemHand();
-			if (this.isAxe(held)) {
-				event.setCancelled(true);
-				this.beginShieldBreaker(player, target);
-				return;
-			}
-			int axeSlot = this.findAxeSlot(player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6());
-			if (axeSlot >= 0) {
-				event.setCancelled(true);
-				this.beginShieldBreakerWithAxe(player, target, axeSlot);
-				return;
-			}
-		}
-		int selectedMaceSlot = this.findBestMaceSlot(target, false);
-		if (selectedMaceSlot < 0) {
-			return;
-		}
-		InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
-		if (selectedMaceSlot == inventory.v()) {
-			return;
-		}
-		event.setCancelled(true);
-		this.beginSwap(player, selectedMaceSlot, target.S(), true);
-		inventory.g(selectedMaceSlot);
-		this.releasePending = this.requestSyntheticAttack();
-	}
+        if (this.swapActive || !this.canOperate()) {
+            return;
+        }
+        EntityPlayerSP player = Minecraft.thePlayer();
+        EntityLivingBase target = this.getCrosshairTarget();
+        if (player.isNull() || target == null) {
+            return;
+        }
+        this.performAttack(player, target, event);
+    }
+
+    private void performAttack(EntityPlayerSP player, EntityLivingBase target, Event event) {
+        if (this.shouldStunSlam(target)) {
+            ItemStack held = player.getHeldItemHand();
+            if (this.isAxe(held)) {
+                if (event != null) event.setCancelled(true);
+                this.beginShieldBreaker(player, target);
+                return;
+            }
+            int axeSlot = this.findAxeSlot(player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6());
+            if (axeSlot >= 0) {
+                if (event != null) event.setCancelled(true);
+                this.beginShieldBreakerWithAxe(player, target, axeSlot);
+                return;
+            }
+        }
+        int selectedMaceSlot = this.findBestMaceSlot(target, false, false);
+        if (selectedMaceSlot < 0) {
+            return;
+        }
+        InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
+        if (selectedMaceSlot == inventory.v()) {
+            return;
+        }
+        if (event != null) event.setCancelled(true);
+        this.beginSwap(player, selectedMaceSlot, target.S(), true);
+        inventory.g(selectedMaceSlot);
+        this.releasePending = this.requestSyntheticAttack();
+    }
 
     private void beginSwap(EntityPlayerSP player, int selectedMaceSlot, int selectedTargetId, boolean countCurrentTick) {
         InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
@@ -282,21 +286,12 @@ public class AutoMace extends Mod {
         if (!this.isAutoAttackReady(target, cooldownOffset)) {
             return;
         }
-        int selectedMaceSlot = this.findBestMaceSlot(target, false);
-        if (selectedMaceSlot < 0) {
-            return;
-        }
-        InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
-        if (selectedMaceSlot != inventory.v()) {
-            this.beginSwap(player, selectedMaceSlot, target.S(), true);
-            inventory.g(selectedMaceSlot);
-        }
-        this.releasePending = this.requestSyntheticAttack();
+        this.performAttack(player, target, null);
         this.inputTimer.reset();
     }
 
     private boolean isAutoAttackReady(EntityLivingBase target, float cooldownOffset) {
-        if (RotationUtil.u(Minecraft.thePlayer()) && this.findBestMaceSlot(target, false) >= 0) {
+        if (RotationUtil.u(Minecraft.thePlayer()) && this.findBestMaceSlot(target, false, false) >= 0) {
             return true;
         }
         return AttackCooldownUtil.isAttackReady(cooldownOffset);
@@ -508,7 +503,7 @@ public class AutoMace extends Mod {
                 && RotationUtil.n(new EntityOtherPlayerMP(entity.getObject()));
     }
 
-    private int findBestMaceSlot(EntityLivingBase target, boolean excludeSelected) {
+    private int findBestMaceSlot(EntityLivingBase target, boolean excludeSelected, boolean ignoreSmashOnly) {
         EntityPlayerSP player = Minecraft.thePlayer();
         InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
         int selectedSlot = inventory.v();
@@ -519,7 +514,7 @@ public class AutoMace extends Mod {
                 continue;
             }
             ItemStack stack = inventory.c(slot);
-            double score = this.scoreMace(stack, target);
+            double score = this.scoreMace(stack, target, ignoreSmashOnly);
             if (score <= bestScore) {
                 continue;
             }
@@ -529,8 +524,15 @@ public class AutoMace extends Mod {
         return bestSlot;
     }
 
-    private double scoreMace(ItemStack stack, EntityLivingBase target) {
-        if (!this.isMace(stack) || this.smashOnly.getEffectiveValue().booleanValue()
+    private int findBestMaceSlot(EntityLivingBase target, boolean excludeSelected) {
+        return this.findBestMaceSlot(target, excludeSelected, false);
+    }
+
+    private double scoreMace(ItemStack stack, EntityLivingBase target, boolean ignoreSmashOnly) {
+        if (!this.isMace(stack)) {
+            return -1.0;
+        }
+        if (!ignoreSmashOnly && this.smashOnly.getEffectiveValue().booleanValue()
                 && !RotationUtil.u(Minecraft.thePlayer())) {
             return -1.0;
         }
@@ -585,7 +587,7 @@ public class AutoMace extends Mod {
     }
 
     public boolean hasReadyMace() {
-        return this.findBestMaceSlot(this.getCrosshairTarget(), false) >= 0;
+        return this.findBestMaceSlot(this.getCrosshairTarget(), false, false) >= 0;
     }
 
     private int findAxeSlot(InventoryPlayer inventory) {
@@ -633,103 +635,103 @@ public class AutoMace extends Mod {
     }
 
     private void reset(boolean restoreSlot) {
-		EntityPlayerSP player = Minecraft.thePlayer();
-		if (restoreSlot && player.isNotNull() && this.originalSlot >= 0) {
-			player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6().g(this.originalSlot);
-		}
-		if (this.releasePending) {
-			AttackKeyController.releaseAttackKey();
-		}
-		this.releasePending = false;
-		this.dispatchingSyntheticAttack = false;
-		this.clearSwapState();
-		this.clearArmorSwap(true);
-		this.clearShieldBreakerState();
-		this.waitingForBounce = false;
-		this.sawDownwardMotion = false;
-		this.releaseRotation();
-	}
-	
-	private void updateShieldBreaker(EntityPlayerSP player) {
-		if (this.shieldBreakerWaitingToAttack) {
-			if (++this.shieldBreakerSwapTicks >= 1) {
-				this.executeShieldBreakerAttack(player);
-				this.shieldBreakerWaitingToAttack = false;
-			}
-			return;
-		}
-		if (this.isShieldBreakerComplete() || ++this.shieldBreakerSwapTicks > 3) {
-			InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
-			if (this.shieldBreakerOriginalSlot >= 0) {
-				inventory.g(this.shieldBreakerOriginalSlot);
-			}
-			int maceSlot = this.findBestMaceSlot(this.shieldBreakerTarget, false);
-			if (maceSlot >= 0) {
-				this.beginSwap(player, maceSlot, this.shieldBreakerTarget.S(), true);
-				inventory.g(maceSlot);
-				this.releasePending = this.requestSyntheticAttack();
-			}
-			this.clearShieldBreakerState();
-		} else {
-			if (++this.shieldBreakerSwapTicks >= 2) {
-				this.executeShieldBreakerAttack(player);
-				this.shieldBreakerSwapTicks = 0;
-			}
-		}
-	}
+        EntityPlayerSP player = Minecraft.thePlayer();
+        if (restoreSlot && player.isNotNull() && this.originalSlot >= 0) {
+            player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6().g(this.originalSlot);
+        }
+        if (this.releasePending) {
+            AttackKeyController.releaseAttackKey();
+        }
+        this.releasePending = false;
+        this.dispatchingSyntheticAttack = false;
+        this.clearSwapState();
+        this.clearArmorSwap(true);
+        this.clearShieldBreakerState();
+        this.waitingForBounce = false;
+        this.sawDownwardMotion = false;
+        this.releaseRotation();
+    }
 
-	private void clearShieldBreakerState() {
-		this.shieldBreakerActive = false;
-		this.shieldBreakerWaitingToAttack = false;
-		this.shieldBreakerSwapTicks = 0;
-		this.shieldBreakerOriginalSlot = -1;
-		this.shieldBreakerAxeSlot = -1;
-		this.shieldBreakerTarget = null;
-	}
-	
-	private void beginShieldBreaker(EntityPlayerSP player, EntityLivingBase target) {
-		this.shieldBreakerTarget = target;
-		this.shieldBreakerOriginalSlot = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6().v();
-		this.shieldBreakerAxeSlot = this.shieldBreakerOriginalSlot;
-		this.shieldBreakerActive = true;
-		this.shieldBreakerWaitingToAttack = true;
-		this.shieldBreakerSwapTicks = 0;
-		this.executeShieldBreakerAttack(player);
-	}
+    private void updateShieldBreaker(EntityPlayerSP player) {
+        if (this.shieldBreakerWaitingToAttack) {
+            if (++this.shieldBreakerSwapTicks >= 1) {
+                this.executeShieldBreakerAttack(player);
+                this.shieldBreakerWaitingToAttack = false;
+            }
+            return;
+        }
+        if (this.isShieldBreakerComplete() || ++this.shieldBreakerSwapTicks > 3) {
+            InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
+            if (this.shieldBreakerOriginalSlot >= 0) {
+                inventory.g(this.shieldBreakerOriginalSlot);
+            }
+            int maceSlot = this.findBestMaceSlot(this.shieldBreakerTarget, false, true);
+            if (maceSlot >= 0) {
+                this.beginSwap(player, maceSlot, this.shieldBreakerTarget.S(), true);
+                inventory.g(maceSlot);
+                this.releasePending = this.requestSyntheticAttack();
+            }
+            this.clearShieldBreakerState();
+        } else {
+            if (++this.shieldBreakerSwapTicks >= 2) {
+                this.executeShieldBreakerAttack(player);
+                this.shieldBreakerSwapTicks = 0;
+            }
+        }
+    }
 
-	private void beginShieldBreakerWithAxe(EntityPlayerSP player, EntityLivingBase target, int axeSlot) {
-		InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
-		this.shieldBreakerTarget = target;
-		this.shieldBreakerOriginalSlot = inventory.v();
-		this.shieldBreakerAxeSlot = axeSlot;
-		inventory.g(axeSlot);
-		this.shieldBreakerActive = true;
-		this.shieldBreakerWaitingToAttack = true;
-		this.shieldBreakerSwapTicks = 0;
-		this.executeShieldBreakerAttack(player);
-	}
+    private void clearShieldBreakerState() {
+        this.shieldBreakerActive = false;
+        this.shieldBreakerWaitingToAttack = false;
+        this.shieldBreakerSwapTicks = 0;
+        this.shieldBreakerOriginalSlot = -1;
+        this.shieldBreakerAxeSlot = -1;
+        this.shieldBreakerTarget = null;
+    }
 
-	private void executeShieldBreakerAttack(EntityPlayerSP player) {
-		AttackKeyController.releaseAttackKey();
-		this.releasePending = AttackKeyController.requestSyntheticAttack(this);
-		if (this.releasePending) {
-			AttackKeyController.releaseAttackKey();
-			this.releasePending = AttackKeyController.requestSyntheticAttack(this);
-		}
-		this.shieldBreakerWaitingToAttack = false;
-		this.shieldBreakerSwapTicks = 0;
-	}
+    private void beginShieldBreaker(EntityPlayerSP player, EntityLivingBase target) {
+        this.shieldBreakerTarget = target;
+        this.shieldBreakerOriginalSlot = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6().v();
+        this.shieldBreakerAxeSlot = this.shieldBreakerOriginalSlot;
+        this.shieldBreakerActive = true;
+        this.shieldBreakerWaitingToAttack = true;
+        this.shieldBreakerSwapTicks = 0;
+        this.executeShieldBreakerAttack(player);
+    }
 
-	private boolean isShieldBreakerComplete() {
-		if (this.shieldBreakerTarget == null) {
-			return true;
-		}
-		Entity entity = new Entity(this.shieldBreakerTarget.getObject());
-		if (entity.isInstance(MappedClasses.lG)) {
-			return !RotationUtil.n(new EntityOtherPlayerMP(entity.getObject()));
-		}
-		return true;
-	}
+    private void beginShieldBreakerWithAxe(EntityPlayerSP player, EntityLivingBase target, int axeSlot) {
+        InventoryPlayer inventory = player.V$src$Lgg_vape_wrapper_impl_InventoryPlayer_$erqak6();
+        this.shieldBreakerTarget = target;
+        this.shieldBreakerOriginalSlot = inventory.v();
+        this.shieldBreakerAxeSlot = axeSlot;
+        inventory.g(axeSlot);
+        this.shieldBreakerActive = true;
+        this.shieldBreakerWaitingToAttack = true;
+        this.shieldBreakerSwapTicks = 0;
+        this.executeShieldBreakerAttack(player);
+    }
+
+    private void executeShieldBreakerAttack(EntityPlayerSP player) {
+        AttackKeyController.releaseAttackKey();
+        this.releasePending = AttackKeyController.requestSyntheticAttack(this);
+        if (this.releasePending) {
+            AttackKeyController.releaseAttackKey();
+            this.releasePending = AttackKeyController.requestSyntheticAttack(this);
+        }
+        this.shieldBreakerWaitingToAttack = false;
+        this.shieldBreakerSwapTicks = 0;
+    }
+
+    private boolean isShieldBreakerComplete() {
+        if (this.shieldBreakerTarget == null) {
+            return true;
+        }
+        Entity entity = new Entity(this.shieldBreakerTarget.getObject());
+        if (entity.isInstance(MappedClasses.lG)) {
+            return !RotationUtil.n(new EntityOtherPlayerMP(entity.getObject()));
+        }
+        return true;
+    }
 
     @Override
     public void onDisable() {
